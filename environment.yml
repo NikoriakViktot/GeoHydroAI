@@ -1,0 +1,33 @@
+name: geohydroai
+channels:
+  - conda-forge
+  - default
+channel_priority: strict
+dependencies:
+  - python=3.11
+  - pandas
+  - geopandas
+  - geoai
+  - numpy
+  - dask
+  - dask-geopandas
+  - rasterio
+  - xdem
+  - plotly
+  - dash
+  - dash-leaflet
+  - scikit-learn
+  - matplotlib
+  - gunicorn
+  - pyproj
+  - fiona
+  - shapely
+  - h5py
+  - pyarrow
+  - xarray
+  - folium
+  - pip
+  - seaborn
+  - pip:
+      - dash-bootstrap-components
+
