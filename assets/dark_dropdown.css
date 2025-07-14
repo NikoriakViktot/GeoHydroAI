@@ -1,3 +1,6 @@
+/* assets/dark_dropdown.css
+
+
 /* Для всієї сторінки */
 body, .Select-control, .Select-menu-outer {
     background-color: #23272b !important;
@@ -61,4 +64,22 @@ body, .Select-control, .Select-menu-outer {
 .custom-tabs .tab:hover {
     background: #314369 !important;
     color: #fff !important;
+}
+
+.custom-tabs {
+    width: 100% !important;
+}
+
+/* Змінює контейнер вкладок на flex для рівного розтягування */
+.custom-tabs .dash-tabs-container {
+    display: flex !important;
+    width: 100% !important;
+}
+
+/* Контейнери самих Tab */
+.custom-tabs .tab {
+    flex: 1 1 0 !important;   /* ← дає рівномірний розподіл */
+    text-align: center !important;
+    min-width: 120px;         /* мінімальна ширина для адаптивності */
+    margin-right: 2px !important;
 }

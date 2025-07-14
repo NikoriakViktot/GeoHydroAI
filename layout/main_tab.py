@@ -1,18 +1,9 @@
 #main_tab.py
 
-
-import dash
-import duckdb
-from dash import html, dcc, dash_table, Output, Input, State, callback
-from utils.db import DuckDBData
-from utils.plots import build_error_hist, build_error_box, build_dem_stats_bar,plot_cdf_nmad
+from dash import html, dcc, dash_table
 from utils.style import dark_table_style
-from utils.table import get_filtered_table_title
-import dash_bootstrap_components as dbc
-import pandas as pd
-from callbacks.cdf_callback import get_cdf_tab
-import io
 
+import dash_bootstrap_components as dbc
 
 
 def render_main_tab(hist_fig,

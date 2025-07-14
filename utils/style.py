@@ -1,3 +1,5 @@
+#utils/style.py
+
 sidebar_style = {
     "position": "fixed",
     "top": 0,
@@ -173,8 +175,6 @@ dark_card_style = {
     "letterSpacing": "0.03em",
     "border": "1.5px solid #344",
     "boxShadow": "0 2px 10px #10161a70",
-    "display": "inline-block",
-    "maxWidth": "97%"
 }
 
 dark_dropdown_style = {

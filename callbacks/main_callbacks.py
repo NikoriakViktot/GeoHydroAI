@@ -6,13 +6,13 @@ from dash import html, dcc, dash_table, Output, Input, State, callback
 import pandas as pd
 import io
 
-from layout.tracks_map_tab import layout as tracks_map_layout
 from utils.db import DuckDBData
 from utils.plots import build_error_hist, build_error_box, build_dem_stats_bar,plot_cdf_nmad
 from utils.table import get_filtered_table_title, format_selected_filters
 from callbacks.cdf_callback import get_cdf_tab
 from layout.main_tab import render_main_tab
 from layout.tracks_profile_tab import profile_tab_layout
+from layout.tracks_map_tab import tracks_map_layout
 
 dem_list = [
     "alos_dem", "aster_dem", "copernicus_dem", "fab_dem",
@@ -145,7 +145,7 @@ def update_dashboard(n_clicks, tab, cdf_data, dem, lulc, landform, slope,
     elif tab == "tab-2":
         return profile_tab_layout
     elif tab == "tab-3":
-        return html.Div("Тут буде інтерактивна карта (map).")
+        return tracks_map_layout
     elif tab == "tab-4":
         return html.Div("Тут буде інтерактивна карта (map).")
     elif tab == "tab-5":
