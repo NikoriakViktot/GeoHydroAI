@@ -1,1 +1,3 @@
 data/icesat2_dem.parquet
+data/*.parquet
+*.parquet
