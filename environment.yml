@@ -28,6 +28,7 @@ dependencies:
   - folium
   - pip
   - seaborn
+  - pykalman
   - pip:
       - dash-bootstrap-components
 

@@ -1,6 +1,13 @@
 import plotly.graph_objs as go
 import plotly.express as px
 import numpy as np
+import pandas as pd
+
+
+SLOPE_CATEGORIES = [
+    '0–5°', '5–10°', '10–15°', '15–20°', '20–25°', '25–30°', '>30°'
+]
+
 
 def apply_dark_theme(fig):
     fig.update_layout(
@@ -223,3 +230,66 @@ def build_profile_figure_with_hand(df_all, df_hand, dem_key, use_hand):
     )
     return fig
 
+
+
+def build_best_dem_barplot(df, x_col, name_dict=None, title=None):
+    """
+    df: DataFrame з колонками: [x_col, nmad_..., ...]
+    x_col: колонка з категоріями (наприклад, lulc_name, slope_class, landform, hand_class)
+    name_dict: словник для підписів (наприклад, landform_names)
+    title: заголовок графіка
+    """
+    show_x = x_col
+    if name_dict:
+        df["category_label"] = df[x_col].map(name_dict)
+        show_x = "category_label"
+
+    if x_col == "slope_class":
+        df[x_col] = pd.Categorical(df[x_col], categories=SLOPE_CATEGORIES, ordered=True)
+        df = df.sort_values(x_col)
+
+    # Best DEM для кожної групи
+    nmad_cols = [col for col in df.columns if col.startswith("nmad_")]
+    df["best_dem"] = df[nmad_cols].idxmin(axis=1).str.replace("nmad_", "").str.upper()
+    df["best_nmad"] = df[nmad_cols].min(axis=1)
+    fig = px.bar(
+        df,
+        x=show_x,
+        y="best_nmad",
+        color="best_dem",
+        text="best_dem",
+        title=title or "🏆 Найточніша DEM для кожної категорії (за NMAD)",
+        labels={show_x: x_col, "best_nmad": "NMAD (м)", "best_dem": "DEM"}
+    )
+    fig.update_layout(xaxis_tickangle=-45)
+    fig.update_traces(texttemplate='%{text}', textposition='outside')
+    fig = apply_dark_theme(fig)
+    return fig
+
+def build_grouped_nmad_barplot(df, x_col, name_dict=None, title=None):
+    nmad_cols = [col for col in df.columns if col.startswith("nmad_")]
+    show_x = x_col
+    if name_dict:
+        df["category_label"] = df[x_col].map(name_dict)
+        show_x = "category_label"
+    if x_col == "slope_class":
+        df[x_col] = pd.Categorical(df[x_col], categories=SLOPE_CATEGORIES, ordered=True)
+        df = df.sort_values(x_col)
+    df_long = df.melt(id_vars=[x_col] + (["category_label"] if name_dict else []),
+                      value_vars=nmad_cols,
+                      var_name="DEM", value_name="NMAD")
+    df_long["DEM"] = df_long["DEM"].str.replace("nmad_", "").str.upper()
+    fig = px.bar(
+        df_long,
+        x=show_x,
+        y="NMAD",
+        color="DEM",
+        barmode="group",
+        text="NMAD",
+        title=title or "NMAD для кожного DEM у кожній категорії",
+        labels={show_x: x_col, "NMAD": "NMAD (м)", "DEM": "DEM"}
+    )
+    fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
+    fig.update_layout(xaxis_tickangle=-45, uniformtext_minsize=8, uniformtext_mode='hide')
+    fig = apply_dark_theme(fig)
+    return fig

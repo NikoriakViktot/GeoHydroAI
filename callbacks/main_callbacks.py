@@ -37,7 +37,7 @@ def update_dropdowns(dem):
 def load_cdf_data(tab):
     if tab != "tab-5":
         raise dash.exceptions.PreventUpdate
-    print("Завантаження CDF...")
+
     cdf_df = pd.read_parquet("data/cdf_precomputed.parquet")
     return cdf_df.to_json(date_format='iso', orient='split')
 
@@ -63,7 +63,6 @@ def update_dashboard(n_clicks, tab, cdf_data, dem, lulc, landform, slope,
 
     # === Початкове завантаження для tab-1 ===
     if tab == "tab-1" and (n_clicks is None or n_clicks == 0):
-        print("🔁 Initial fast render from cache")
 
         # Завантаження з кешу (Крок 2)
         dff_plot = pd.read_parquet("data/initial_sample.parquet")
@@ -147,7 +146,23 @@ def update_dashboard(n_clicks, tab, cdf_data, dem, lulc, landform, slope,
     elif tab == "tab-3":
         return tracks_map_layout
     elif tab == "tab-4":
-        return html.Div("Тут буде інтерактивна карта (map).")
+        return html.Div([
+    dcc.Dropdown(
+        id="groupby_dropdown",
+        options=[
+            {"label": "LULC", "value": "lulc"},
+            {"label": "Slope", "value": "slope"},
+            {"label": "Geomorphon", "value": "geomorphon"},
+            {"label": "HAND", "value": "hand"},
+        ],
+        value="lulc",
+        clearable=False,
+        style={"width": "300px"}
+    ),
+    dcc.Graph(id="tab4-best-dem"),
+    dcc.Graph(id="tab4-all-dem"),
+])
+
     elif tab == "tab-5":
         if cdf_data is None:
             return html.Div("Завантаження CDF...")

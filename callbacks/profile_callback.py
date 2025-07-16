@@ -2,7 +2,27 @@ from dash import callback, Output, Input, State
 import plotly.graph_objs as go
 import dash_leaflet as dl
 import pandas as pd
+import numpy as np
+from pyproj import Geod
 import duckdb
+from utils.db import DuckDBData
+from utils.plot_track import build_profile_figure_with_hand
+from utils.style import empty_dark_figure
+
+from src.model_filter_point_track import (
+    clean_ground_dbscan,
+    clean_ground_flexible,
+    clean_ground_mnk_local,
+    clean_ground_mnk_local_enhanced,
+)
+
+from src.interpolation_track import (
+        kalman_smooth,
+    interpolate_linear,
+    interpolate_spline,
+    )
+
+db = DuckDBData("data/tracks_3857_1.parquet")
 
 DEM_LIST = [
     "alos_dem", "aster_dem", "copernicus_dem", "fab_dem",
@@ -20,28 +40,12 @@ hand_column_map = {dem: f"{dem}_2000" for dem in DEM_LIST}
     State("selected_profile", "data"),
 )
 def update_tracks_dropdown(year, selected_profile):
-    sql = f"""
-        SELECT DISTINCT track, rgt, spot
-        FROM 'data/tracks_3857_1.parquet'
-        WHERE year = {year}
-          AND atl03_cnf = 4 AND atl08_class = 1
-        ORDER BY track, rgt, spot
-    """
-    try:
-        df = duckdb.query(sql).to_df()
-        options = [
-            {"label": f"Track {row.track} / RGT {row.rgt} / Spot {row.spot}",
-             "value": f"{row.track}_{row.rgt}_{row.spot}"}
-            for _, row in df.iterrows()
-        ]
-        value = options[0]["value"] if options else None
-        if selected_profile and selected_profile.get("track") in [o["value"] for o in options]:
-            value = selected_profile["track"]
-        return options, value
-    except Exception:
-        return [], None
+    options = db.get_track_dropdown_options(year)
+    value = options[0]["value"] if options else None
+    if selected_profile and selected_profile.get("track") in [o["value"] for o in options]:
+        value = selected_profile["track"]
+    return options, value
 
-# --- Date Dropdown
 @callback(
     Output("date_dropdown", "options"),
     Output("date_dropdown", "value"),
@@ -52,25 +56,12 @@ def update_dates_dropdown(track_rgt_spot, selected_profile):
     if not track_rgt_spot:
         return [], None
     track, rgt, spot = map(float, track_rgt_spot.split("_"))
-    sql = f"""
-        SELECT DISTINCT DATE(time) as date_only
-        FROM 'data/tracks_3857_1.parquet'
-        WHERE track={track} AND rgt={rgt} AND spot={spot}
-            AND atl03_cnf = 4 AND atl08_class = 1
-        ORDER BY date_only
-    """
-    try:
-        df = duckdb.query(sql).to_df()
-        options = [{
-            "label": pd.to_datetime(row.date_only).strftime("%Y-%m-%d"),
-            "value": pd.to_datetime(row.date_only).strftime("%Y-%m-%d")
-        } for _, row in df.iterrows()]
-        value = options[0]["value"] if options else None
-        if selected_profile and selected_profile.get("date") in [o["value"] for o in options]:
-            value = selected_profile["date"]
-        return options, value
-    except Exception:
-        return [], None
+    options = db.get_date_dropdown_options(track, rgt, spot)
+    value = options[0]["value"] if options else None
+    if selected_profile and selected_profile.get("date") in [o["value"] for o in options]:
+        value = selected_profile["date"]
+    return options, value
+
 
 # --- STORE: єдиний callback для синхронізації state/history
 @callback(
@@ -93,94 +84,24 @@ def sync_profile_to_store(year, track, dem, date, prev_profile, history):
         history.append(profile)
     return profile, history
 
-# --- Побудова профілю (графік + stats)
-def get_track_data_for_date(track, rgt, spot, dem, date, hand_range=None):
-    hand_col = hand_column_map[dem]
-    sql = f"""
-        SELECT *
-        FROM 'data/tracks_3857_1.parquet'
-        WHERE track={track} AND rgt={rgt} AND spot={spot}
-            AND DATE(time) = '{date}'
-            AND delta_{dem} IS NOT NULL AND h_{dem} IS NOT NULL
-            AND atl03_cnf = 4 AND atl08_class = 1
-    """
-    if hand_range and len(hand_range) == 2 and all(x is not None for x in hand_range):
-        sql += f" AND {hand_col} IS NOT NULL AND {hand_col} BETWEEN {hand_range[0]} AND {hand_range[1]}"
-    sql += " ORDER BY x"
-    try:
-        df = duckdb.query(sql).to_df()
-        return df
-    except Exception:
-        return pd.DataFrame()
 
-def get_dem_stats(df, dem_key):
-    delta_col = f"delta_{dem_key}"
-    if delta_col not in df:
-        return None
-    delta = df[delta_col].dropna()
-    if delta.empty:
-        return None
-    return {
-        "mean": delta.mean(),
-        "min": delta.min(),
-        "max": delta.max(),
-        "count": len(delta)
-    }
+def add_distance_m(df, lon_col="x", lat_col="y"):
+    geod = Geod(ellps="WGS84")
+    if lon_col in df and lat_col in df:
+        lons = df[lon_col].values
+        lats = df[lat_col].values
+        # Вираховуємо послідовні відстані між точками в метрах
+        dists = np.zeros(len(df))
+        if len(df) > 1:
+            _, _, dists_pair = geod.inv(lons[:-1], lats[:-1], lons[1:], lats[1:])
+            dists[1:] = dists_pair
+        df = df.copy()
+        df["distance_m"] = np.cumsum(dists)
+    else:
+        df["distance_m"] = np.arange(len(df))
+    return df
 
-def build_profile_figure_with_hand(df_all, df_hand, dem_key, use_hand):
-    fig = go.Figure()
-    if not df_all.empty and f"h_{dem_key}" in df_all:
-        x_axis_dem = df_all["distance_m"] if "distance_m" in df_all else df_all["x"]
-        fig.add_trace(go.Scatter(
-            x=x_axis_dem,
-            y=df_all[f"h_{dem_key}"],
-            mode="markers",
-            marker=dict(size=2, color="lightgray"),
-            name=f"{dem_key.upper()} DEM",
-            opacity=0.9
-        ))
-    show_df = df_hand if (use_hand and not df_hand.empty) else df_all
-    if not show_df.empty and "orthometric_height" in show_df:
-        x_axis_ice = show_df["distance_m"] if "distance_m" in show_df else show_df["x"]
-        fig.add_trace(go.Scatter(
-            x=x_axis_ice,
-            y=show_df["orthometric_height"],
-            mode="markers",
-            marker=dict(size=2, color="crimson"),
-            name="ICESat-2 Orthometric Height",
-            opacity=0.9
-        ))
-    if f"delta_{dem_key}" in df_all and not df_all[f"delta_{dem_key}"].dropna().empty:
-        delta = df_all[f"delta_{dem_key}"].dropna()
-        stats_text = (
-            f"Похибка {dem_key.upper()}: "
-            f"Сер: {delta.mean():.2f} м, "
-            f"Мін: {delta.min():.2f} м, "
-            f"Макс: {delta.max():.2f} м"
-        )
-        fig.add_annotation(
-            text=stats_text,
-            xref="paper", yref="paper",
-            x=0.02, y=0.99,
-            showarrow=False,
-            font=dict(size=13, color="lightgray", family="monospace"),
-            align="left",
-            bordercolor="gray", borderwidth=1,
-            xanchor="left"
-        )
-    fig.update_layout(
-        xaxis=dict(title="Відстань/Longitude", gridcolor="#666", gridwidth=0.6, griddash="dot", zerolinecolor="#555"),
-        yaxis=dict(title="Ортометрична висота (м)", gridcolor="#666", gridwidth=0.3, griddash="dot", zerolinecolor="#555"),
-        height=600,
-        legend=dict(orientation="h", y=1.06, x=0.5, xanchor="center", font=dict(size=12), bgcolor='rgba(0,0,0,0)'),
-        plot_bgcolor="#20232A",
-        paper_bgcolor="#181818",
-        font_color="#EEE",
-        margin=dict(l=70, r=50, t=40, b=40)
-    )
-    return fig
 
-# --- Графік профілю
 @callback(
     Output("track_profile_graph", "figure"),
     Output("dem_stats", "children"),
@@ -189,32 +110,104 @@ def build_profile_figure_with_hand(df_all, df_hand, dem_key, use_hand):
     Input("date_dropdown", "value"),
     Input("hand_slider", "value"),
     Input("hand_toggle", "value"),
+    Input("interp_method", "value"),
+    Input("kalman_q", "value"),
+    Input("kalman_r", "value"),
+
 )
-def update_profile(track_rgt_spot, dem, date, hand_range, hand_toggle):
+def update_profile(track_rgt_spot,
+                   dem, date,
+                   hand_range,
+                   hand_toggle,
+                   interp_method,
+                   kalman_q,
+                   kalman_r,):
+    # --- 0. Перевірка наявності ключів
     if not (track_rgt_spot and date and dem):
-        fig = go.Figure()
-        fig.update_layout(plot_bgcolor="#20232A", paper_bgcolor="#181818", font_color="#EEE", height=600)
-        return fig, ""
+        return empty_dark_figure(text="Немає даних для побудови профілю."), "No error stats"
+
     try:
         track, rgt, spot = map(float, track_rgt_spot.split("_"))
     except Exception:
-        fig = go.Figure()
-        fig.update_layout(plot_bgcolor="#20232A", paper_bgcolor="#181818", font_color="#EEE", height=600)
-        return fig, ""
+        return empty_dark_figure(text="Некоректний формат треку."), "No error stats"
+
+    # --- 1. HAND-фільтр (за бажанням)
     use_hand = "on" in hand_toggle
-    hand_range_for_query = hand_range if (use_hand and hand_range and len(hand_range) == 2 and all(isinstance(x, (int, float)) for x in hand_range)) else None
-    df_hand = get_track_data_for_date(track, rgt, spot, dem, date, hand_range_for_query)
-    df_all = get_track_data_for_date(track, rgt, spot, dem, date, None)
-    fig = build_profile_figure_with_hand(df_all, df_hand, dem, use_hand)
-    stats = get_dem_stats(df_all, dem)
+    hand_range_for_query = hand_range if (use_hand and hand_range and len(hand_range) == 2 and all(
+        isinstance(x, (int, float)) for x in hand_range)) else None
+
+    # --- 2. Дані (повний профіль + hand профіль)
+    df_hand = db.get_profile(track, rgt, spot, dem, date, hand_range_for_query)
+    if not df_hand.empty and "distance_m" not in df_hand:
+        df_hand = add_distance_m(df_hand)
+    df_all = db.get_profile(track, rgt, spot, dem, date, None)
+    if not df_all.empty and "distance_m" not in df_all:
+        df_all = add_distance_m(df_all)
+
+    # --- 3. Перевірка даних для DEM
+    if (
+        df_all is None or df_all.empty or
+        f"h_{dem}" not in df_all or
+        df_all[f"h_{dem}"].dropna().empty
+    ):
+        return empty_dark_figure(text="Немає даних для побудови профілю."), "No error stats"
+
+    # --- 4. Готуємо ICESat-2 профіль для фільтрації
+    if "distance_m" in df_all and "orthometric_height" in df_all:
+        df_ice = df_all[["distance_m", "orthometric_height"]].dropna().copy()
+        df_ice = df_ice.sort_values("distance_m")
+    else:
+        df_ice = pd.DataFrame(columns=["distance_m", "orthometric_height"])
+
+
+    interpolated_df = None
+
+    if interp_method and interp_method not in ["none", "raw", None, ""]:
+        if not df_ice.empty:
+            grid = np.linspace(df_ice["distance_m"].min(), df_ice["distance_m"].max(), 300)
+            if interp_method == "linear":
+                interpolated_df = interpolate_linear(df_ice, grid=grid)
+            elif interp_method == "kalman":
+                transition_cov = 10 ** kalman_q
+                observation_cov = kalman_r
+                smooth_df = kalman_smooth(
+                    df_ice,
+                    transition_covariance=transition_cov,
+                    observation_covariance=observation_cov
+                )
+                interpolated_df = smooth_df[["distance_m", "kalman_smooth"]].rename(
+                    columns={"kalman_smooth": "orthometric_height"}
+                )
+        else:
+            # Якщо ICESat-2 немає, будуємо профіль по FABDEM
+            if "distance_m" in df_all and f"h_fab_dem" in df_all:
+                interpolated_df = df_all[["distance_m", "h_fab_dem"]].dropna().copy()
+                interpolated_df.rename(columns={f"h_fab_dem": "orthometric_height"}, inplace=True)
+
+    # --- Всі дані передаємо у малювалку!
+    fig = build_profile_figure_with_hand(
+        df_all=df_all,
+        df_hand=df_hand,
+        dem_key=dem,
+        use_hand=use_hand,
+        interpolated_df=interpolated_df,
+        interp_method=interp_method
+    )
+
+
+
+    # --- 7. Підпис статистики
+    stats = db.get_dem_stats(df_all, dem)
     stats_text = (
         f"Mean error: {stats['mean']:.2f} м, "
         f"Min: {stats['min']:.2f} м, Max: {stats['max']:.2f} м, "
         f"Points: {stats['count']}" if stats else "No error stats"
     )
+
     return fig, stats_text
 
-# --- Карта
+
+
 @callback(
     Output("point_group", "children"),
     Input("selected_profile", "data"),
@@ -233,11 +226,10 @@ def update_map_points(selected_profile, hand_range, hand_toggle):
         return []
     use_hand = "on" in hand_toggle
     hand_range_for_query = (
-        hand_range
-        if (use_hand and hand_range and len(hand_range) == 2 and all(isinstance(x, (int, float)) for x in hand_range))
+        hand_range if (use_hand and hand_range and len(hand_range) == 2 and all(isinstance(x, (int, float)) for x in hand_range))
         else None
     )
-    df = get_track_data_for_date(track, rgt, spot, dem, date, hand_range_for_query)
+    df = db.get_profile(track, rgt, spot, dem, date, hand_range_for_query)
     if df is None or df.empty:
         return []
     lon_col = "x"
@@ -245,13 +237,13 @@ def update_map_points(selected_profile, hand_range, hand_toggle):
     delta_col = f"delta_{dem}"
     ortho_col = "orthometric_height"
 
+    SAMPLE_STEP = 10  # ← Змінюй, як треба
+    df_sampled = df.iloc[::SAMPLE_STEP].copy()
+
     def tooltip_text(row):
         delta_val = row[delta_col] if pd.notna(row[delta_col]) else "NaN"
         ortho_val = row[ortho_col] if ortho_col in row and pd.notna(row[ortho_col]) else "NaN"
-        return (
-            # f"ΔDEM: {delta_val:.2f} м."
-            f"ICESat-2 (Ortho): {ortho_val:.2f} м."
-        )
+        return f"ICESat-2 (Ortho): {ortho_val:.2f} м."
 
     markers = [
         dl.CircleMarker(
@@ -262,8 +254,9 @@ def update_map_points(selected_profile, hand_range, hand_toggle):
             fillOpacity=0.9,
             children=[dl.Tooltip(tooltip_text(row))],
         )
-        for _, row in df.iterrows() if pd.notna(row[delta_col]) and pd.notna(row[ortho_col])
+        for _, row in df_sampled.iterrows() if pd.notna(row[delta_col]) and pd.notna(row[ortho_col])
     ]
+    # Виділяємо мін/макс — вони можуть бути не у sample, тож їх краще брати з оригінального df:
     if not df[delta_col].dropna().empty:
         min_idx = df[delta_col].idxmin()
         max_idx = df[delta_col].idxmax()

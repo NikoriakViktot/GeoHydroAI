@@ -30,7 +30,7 @@ sidebar = html.Div([
     html.Label("HAND:", style=label_style),
     dcc.Checklist(id="hand_toggle",
                   options=[{"label": "Фільтрувати", "value": "on"}],
-                  value=["on"], style={"color": "#EEE"}),
+                  value=[], style={"color": "#EEE"}),
     dcc.RangeSlider(id="hand_slider", min=0, max=21, step=1,
                     marks={i: str(i) for i in range(0, 21, 5)},
                     value=[0, 5]),

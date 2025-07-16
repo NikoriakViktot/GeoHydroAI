@@ -1,4 +1,6 @@
 #utils/style.py
+import plotly.graph_objs as go
+
 
 sidebar_style = {
     "position": "fixed",
@@ -206,4 +208,26 @@ def apply_dark_theme(fig):
         ),
         margin=dict(l=45, r=30, t=50, b=40),  # Додай трохи місця
     )
+    return fig
+
+def empty_dark_figure(height=600, text=None):
+    fig = go.Figure()
+    fig.update_layout(
+        plot_bgcolor="#20232A",
+        paper_bgcolor="#181818",
+        font_color="#EEE",
+        height=height,
+        xaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False),
+        yaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False),
+        margin=dict(l=70, r=50, t=40, b=40)
+    )
+    if text:
+        fig.add_annotation(
+            text=text,
+            xref="paper", yref="paper",
+            x=0.5, y=0.5,
+            showarrow=False,
+            font=dict(size=16, color="#AAA", family="monospace"),
+            xanchor="center", yanchor="middle"
+        )
     return fig

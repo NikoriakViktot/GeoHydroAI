@@ -13,7 +13,8 @@ YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
 
 
 # Читання шару басейну (GeoJSON)
-basin = gpd.read_file("data/basin_bil_cher_4326.gpkg", crs=4326)
+basin = gpd.read_file("data/basin_bil_cher_4326.gpkg")
+basin = basin.to_crs("EPSG:4326")
 basin = json.loads(basin.to_json())
 
 tracks_map_layout = html.Div([

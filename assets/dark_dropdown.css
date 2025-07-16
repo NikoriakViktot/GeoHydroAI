@@ -83,3 +83,12 @@ body, .Select-control, .Select-menu-outer {
     min-width: 120px;         /* мінімальна ширина для адаптивності */
     margin-right: 2px !important;
 }
+
+body, .dash-graph, .js-plotly-plot, .dash-loading, .dash-spinner {
+    background-color: #181818 !important;
+}
+
+.dash-loading {
+    background-color: #181818 !important;
+    opacity: 1 !important;
+}
