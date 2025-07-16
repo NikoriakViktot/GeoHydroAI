@@ -35,7 +35,7 @@ def update_best_dem_tab(n_clicks, groupby, dem, lulc, landform, slope, hand_togg
             )
             fig1 = build_best_dem_barplot(df, x_col="lulc_name", title="🏆 Найкраща DEM для кожного класу LULC (NMAD)")
             fig2 = build_grouped_nmad_barplot(df, x_col="lulc_name", title="NMAD для кожного DEM у класах LULC")
-        elif groupby == "slope":
+        elif groupby == "slope_horn":
             df = db.get_nmad_grouped_by_slope(
                 con, slope_range=slope, hand_range=hand_range_, lulc=lulc, landform=landform
             )

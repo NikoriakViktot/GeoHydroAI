@@ -151,7 +151,7 @@ def update_dashboard(n_clicks, tab, cdf_data, dem, lulc, landform, slope,
         id="groupby_dropdown",
         options=[
             {"label": "LULC", "value": "lulc"},
-            {"label": "Slope", "value": "slope"},
+            {"label": "Slope", "value": "slope_horn"},
             {"label": "Geomorphon", "value": "geomorphon"},
             {"label": "HAND", "value": "hand"},
         ],

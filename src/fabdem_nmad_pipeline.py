@@ -52,7 +52,7 @@ print("✅ Файл збережено: data/nmad_best_dem.parquet")
 # CREATE OR REPLACE TABLE nmad_table AS
 # SELECT
 #   fab_dem_geomorphon AS geomorphon,
-#   fab_dem_slope AS slope,
+#   fab_dem_slope AS slope_horn,
 #   fab_dem_2000 AS hand,
 #   fab_dem_twi AS twi,
 #   fab_dem_stream AS dist_river,

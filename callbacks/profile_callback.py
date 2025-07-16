@@ -9,17 +9,10 @@ from utils.db import DuckDBData
 from utils.plot_track import build_profile_figure_with_hand
 from utils.style import empty_dark_figure
 
-from src.model_filter_point_track import (
-    clean_ground_dbscan,
-    clean_ground_flexible,
-    clean_ground_mnk_local,
-    clean_ground_mnk_local_enhanced,
-)
 
 from src.interpolation_track import (
         kalman_smooth,
     interpolate_linear,
-    interpolate_spline,
     )
 
 db = DuckDBData("data/tracks_3857_1.parquet")

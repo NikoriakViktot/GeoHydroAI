@@ -18,7 +18,6 @@ dependencies:
   - dash-leaflet
   - scikit-learn
   - matplotlib
-  - gunicorn
   - pyproj
   - fiona
   - shapely
@@ -31,4 +30,6 @@ dependencies:
   - pykalman
   - pip:
       - dash-bootstrap-components
+      - terracotta[server]
+      - gunicorn
 
