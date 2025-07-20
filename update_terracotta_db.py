@@ -76,7 +76,7 @@ with driver.connect():
         except Exception as e:
             print(f"❌ failed: {record['name']} — {e}")
 
-# --- Зберегти index.json для Dash
-with open("index.json", "w") as f:
+# --- Зберегти metadata.json для Dash
+with open("metadata.json", "w") as f:
     json.dump(index_list, f, indent=2)
-    print("📦 index.json оновлено")
+    print("📦 metadata.json оновлено")

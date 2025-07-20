@@ -44,7 +44,7 @@ tracks_map_layout = html.Div([
             attribution="© OpenTopoMap contributors"
         ),
         dl.LayerGroup(id="point_group"),
-        dl.GeoJSON(data=basin, id="basin", options={"style": {"color": "blue", "weight": 2}})
+        dl.GeoJSON(data=basin, id="basin_track_map", options={"style": {"color": "blue", "weight": 2, "fill": False}})
     ],
         style={
             "height": "520px",

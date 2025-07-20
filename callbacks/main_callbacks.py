@@ -18,7 +18,8 @@ dem_list = [
     "alos_dem", "aster_dem", "copernicus_dem", "fab_dem",
     "nasa_dem", "srtm_dem", "tan_dem"
 ]
-db = DuckDBData("data/tracks_3857_1.parquet")
+# db = DuckDBData("data/tracks_3857_1.parquet")
+db = DuckDBData("data/NMAD_dem.parquet")
 
 
 @callback(
